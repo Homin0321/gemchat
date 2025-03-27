@@ -2,7 +2,6 @@ import streamlit as st
 import google.generativeai as genai
 import os
 
-PASSWORD = st.secrets["passwd"]
 API_KEY = st.secrets["api_key"]
 TEMPERATURE = 0.5
 
