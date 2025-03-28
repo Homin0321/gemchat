@@ -164,6 +164,8 @@ if prompt := st.chat_input("What would you like to ask?"):
                 f.write(image_bytes)
             image = PIL.Image.open("st_image.png")
             prompt = [prompt, image]
+            paste_result.image_data = None
+            os.remove("st_image.png")
     
         response_stream = chat.send_message(prompt, stream=True)
 
