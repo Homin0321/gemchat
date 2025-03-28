@@ -1,5 +1,8 @@
 import streamlit as st
 import google.generativeai as genai
+from streamlit_paste_button import paste_image_button as pbutton
+from io import BytesIO
+import PIL.Image
 import os
 
 API_KEY = st.secrets["api_key"]
@@ -29,6 +32,27 @@ st.set_page_config(
 
 with st.sidebar:
     st.header("Gemini Chatbot")
+
+    paste_result = pbutton("Upload Clipboard Image", text_color="#000000",
+        background_color="#FFFFFF", hover_background_color="#FF8884")
+
+    if st.button("Input Text", use_container_width=True):
+        input_text()
+
+    if st.button("Clear Text", use_container_width=True):
+        if "text" in st.session_state:
+            st.session_state.text = ''
+
+    if st.button("Show Markdown", use_container_width=True):
+        show_markdown()
+
+    if st.button("Clear Chat History", use_container_width=True, key="clear_chat"):
+        st.session_state.messages = [
+            {"role": "assistant", "content": "Hello! How can I help you today?"}
+        ]
+        st.session_state.gemini_chat_session = None  # Reset chat session object
+        st.rerun()  # Rerun the app to reflect the cleared state
+
     # Model Selection
     model_options = [
         "gemini-2.0-flash",
@@ -50,15 +74,6 @@ with st.sidebar:
         ]
         st.rerun()
 
-    if st.button("Input Text", use_container_width=True):
-        input_text()
-
-    if st.button("Clear Text", use_container_width=True):
-        if "text" in st.session_state:
-            st.session_state.text = ''
-
-    if st.button("Show Markdown", use_container_width=True):
-        show_markdown()
 
 # --- Initialization ---
 # Initialize chat history in session state if it doesn't exist
@@ -139,8 +154,17 @@ if prompt := st.chat_input("What would you like to ask?"):
         chat = st.session_state.gemini_chat_session
         # Ensure streaming is enabled
         if "text" in st.session_state:
-            prompt = prompt + ': ' + st.session_state.text
+            prompt = [prompt, st.session_state.text]
 
+        if paste_result.image_data is not None:
+            image_bytes = BytesIO()
+            paste_result.image_data.save(image_bytes, format='PNG')
+            image_bytes = image_bytes.getvalue()
+            with open("st_image.png", 'wb') as f:
+                f.write(image_bytes)
+            image = PIL.Image.open("st_image.png")
+            prompt = [prompt, image]
+    
         response_stream = chat.send_message(prompt, stream=True)
 
         full_response_content = ""
@@ -225,12 +249,3 @@ if prompt := st.chat_input("What would you like to ask?"):
         # Add an error message to the chat history
         st.session_state.messages.append({"role": "assistant", "content": f"*Error: Could not get response. {e}*"})
 
-
-# --- Sidebar Clear Chat Button ---
-if st.sidebar.button("Clear Chat History", use_container_width=True, key="clear_chat"):
-    st.session_state.messages = [
-        {"role": "assistant", "content": "Hello! How can I help you today?"}
-    ]
-    st.session_state.gemini_chat_session = None  # Reset chat session object
-    # No need to explicitly call get_gemini_chat_session here, it will re-run on next input
-    st.rerun()  # Rerun the app to reflect the cleared state
