@@ -6,7 +6,6 @@ import PIL.Image
 import os
 
 API_KEY = st.secrets["api_key"]
-TEMPERATURE = 0.5
 
 @st.dialog("Input Text", width="large")
 def input_text():
@@ -67,6 +66,8 @@ with st.sidebar:
         key="model_select"  # Use a key for the selectbox
     )
 
+    #st.session_state.temperature = st.slider("Temperature:", 0.0, 1.0)
+
     if st.button("Change Model", use_container_width=True): #Added a button to force model change
         st.session_state.gemini_chat_session = None #Reset the chat session
         st.session_state.messages = [
@@ -91,9 +92,10 @@ if "gemini_chat_session" not in st.session_state:
 def get_gemini_chat_session(model_name):
     try:
         genai.configure(api_key=API_KEY)
+        #temperature = st.session_state.get("temperature", 0)
         model = genai.GenerativeModel(
             model_name,
-            generation_config=genai.types.GenerationConfig(temperature=TEMPERATURE),
+            generation_config=genai.types.GenerationConfig(temperature=0),
             safety_settings=[
                 {"category": "HARM_CATEGORY_HARASSMENT", "threshold": "BLOCK_NONE"},
                 {"category": "HARM_CATEGORY_HATE_SPEECH", "threshold": "BLOCK_NONE"},
