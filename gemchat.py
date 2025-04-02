@@ -50,6 +50,8 @@ with st.sidebar:
             {"role": "assistant", "content": "Hello! How can I help you today?"}
         ]
         st.session_state.gemini_chat_session = None  # Reset chat session object
+        if "text" in st.session_state:
+            st.session_state.text = ''
         st.rerun()  # Rerun the app to reflect the cleared state
 
     # Model Selection
