@@ -24,8 +24,8 @@ def show_markdown():
 
 # Page configuration
 st.set_page_config(
-    page_title="💬 Gemini Chat",
-    page_icon="🤖",
+    page_title="Gemini Chat",
+    page_icon="💬",
     layout="wide"
 )
 
