@@ -1,5 +1,6 @@
 import streamlit as st
-import google.generativeai as genai
+from google import genai
+from google.genai.types import Tool, GenerateContentConfig, GoogleSearch
 from streamlit_paste_button import paste_image_button as pbutton
 from io import BytesIO
 import PIL.Image
@@ -7,20 +8,23 @@ import os
 
 API_KEY = st.secrets["api_key"]
 
+# Initialize the Gemini client (only once)
+@st.cache_resource  # Cache the client to avoid re-initialization
+def get_gemini_client(api_key):
+    return genai.Client(api_key=api_key)
+
 @st.dialog("Input Text", width="large")
 def input_text():
-    text = ''
-    if "text" in st.session_state:
-        text = st.session_state.text
-
+    text = st.session_state.get("text", "")  # Use get to avoid KeyError
     text = st.text_area("Edit:", text, height=600, label_visibility="collapsed")
     st.session_state.text = text
 
 @st.dialog("Markdown Source", width="large")
 def show_markdown():
-    length = len(st.session_state.messages)
-    if length > 0:
-        st.code(st.session_state.messages[length-1]["content"], language="markdown")
+    if st.session_state.get("messages"):  # Check if messages exist
+        length = len(st.session_state.messages)
+        if length > 0:
+            st.code(st.session_state.messages[length - 1]["content"], language="markdown")
 
 # Page configuration
 st.set_page_config(
@@ -39,8 +43,7 @@ with st.sidebar:
         input_text()
 
     if st.button("Clear Text", use_container_width=True):
-        if "text" in st.session_state:
-            st.session_state.text = ''
+        st.session_state.text = ''  # No need to check if it exists first
 
     if st.button("Show Markdown", use_container_width=True):
         show_markdown()
@@ -50,8 +53,7 @@ with st.sidebar:
             {"role": "assistant", "content": "Hello! How can I help you today?"}
         ]
         st.session_state.gemini_chat_session = None  # Reset chat session object
-        if "text" in st.session_state:
-            st.session_state.text = ''
+        st.session_state.text = ''  # Clear text
         st.rerun()  # Rerun the app to reflect the cleared state
 
     # Model Selection
@@ -69,10 +71,12 @@ with st.sidebar:
         key="model_select"  # Use a key for the selectbox
     )
 
-    #st.session_state.temperature = st.slider("Temperature:", 0.0, 1.0)
+    # Add a checkbox to include or exclude the config
+    ground_search = st.checkbox("Ground Google Search", value=False)
 
-    if st.button("Change Model", use_container_width=True): #Added a button to force model change
-        st.session_state.gemini_chat_session = None #Reset the chat session
+    if st.button("Change Model", use_container_width=True):
+        st.session_state.gemini_chat_session = None
+        st.session_state.ground_search = ground_search
         st.session_state.messages = [
             {"role": "assistant", "content": "Hello! How can I help you today?"}
         ]
@@ -94,41 +98,29 @@ if "gemini_chat_session" not in st.session_state:
 # Function to configure and get the chat model
 def get_gemini_chat_session(model_name):
     try:
-        genai.configure(api_key=API_KEY)
-        #temperature = st.session_state.get("temperature", 0)
-        model = genai.GenerativeModel(
-            model_name,
-            generation_config=genai.types.GenerationConfig(temperature=0),
-            safety_settings=[
-                {"category": "HARM_CATEGORY_HARASSMENT", "threshold": "BLOCK_NONE"},
-                {"category": "HARM_CATEGORY_HATE_SPEECH", "threshold": "BLOCK_NONE"},
-                {"category": "HARM_CATEGORY_SEXUALLY_EXPLICIT", "threshold": "BLOCK_NONE"},
-                {"category": "HARM_CATEGORY_DANGEROUS_CONTENT", "threshold": "BLOCK_NONE"},
-            ],
+        client = get_gemini_client(API_KEY)
+
+        config = None  # Initialize config to None
+        if st.session_state.get("ground_search", False):
+            google_search_tool = Tool(
+                google_search = GoogleSearch()
+            )
+            config = GenerateContentConfig(
+                tools=[google_search_tool],
+                response_modalities=["TEXT"],
+            )
+
+        chat = client.chats.create(
+            model=model_name,
+            config=config  # Pass the config (or None)
         )
 
-        # Convert Streamlit message history to Gemini format
-        gemini_history = []
-        for msg in st.session_state.messages:
-            # Map Streamlit roles ('assistant', 'user') to Gemini roles ('model', 'user')
-            role = 'model' if msg["role"] == 'assistant' else msg["role"]
-            # Ensure content is always treated as text parts
-            parts = [{'text': str(msg["content"])}]  # Ensure content is string
-            gemini_history.append({'role': role, 'parts': parts})
-
-        # Remove the last 'model' entry if it exists, as start_chat expects user to start or empty history
-        if gemini_history and gemini_history[-1]['role'] == 'model':
-            # Keep the initial assistant message if it's the only one
-            if len(gemini_history) > 1:
-                gemini_history.pop()
-
         # Start the chat session with history
-        return model.start_chat(history=gemini_history)
+        return chat
 
     except Exception as e:
         st.error(f"Error configuring Google AI or starting chat: {e}")
         return None
-
 
 # Attempt to get/create chat session if API key is available and session doesn't exist
 if st.session_state.gemini_chat_session is None:
@@ -158,21 +150,27 @@ if prompt := st.chat_input("What would you like to ask?"):
     try:
         chat = st.session_state.gemini_chat_session
         # Ensure streaming is enabled
-        if "text" in st.session_state:
-            prompt = [prompt, st.session_state.text]
+        input_prompt = prompt  # Initialize with the user's prompt
+        if "text" in st.session_state and st.session_state.text:
+            input_prompt = [prompt, st.session_state.text]
 
         if paste_result.image_data is not None:
             image_bytes = BytesIO()
             paste_result.image_data.save(image_bytes, format='PNG')
             image_bytes = image_bytes.getvalue()
-            with open("st_image.png", 'wb') as f:
-                f.write(image_bytes)
-            image = PIL.Image.open("st_image.png")
-            prompt = [prompt, image]
-            paste_result.image_data = None
-            os.remove("st_image.png")
-    
-        response_stream = chat.send_message(prompt, stream=True)
+            try:
+                with open("st_image.png", 'wb') as f:
+                    f.write(image_bytes)
+                image = PIL.Image.open("st_image.png")
+                input_prompt = [input_prompt, image]
+            except Exception as e:
+                st.error(f"Error processing image: {e}")
+            finally:
+                paste_result.image_data = None  # Clear the image data
+                if os.path.exists("st_image.png"):
+                    os.remove("st_image.png")
+
+        response_stream = chat.send_message_stream(input_prompt)
 
         full_response_content = ""
         with st.chat_message("assistant"):
@@ -187,7 +185,8 @@ if prompt := st.chat_input("What would you like to ask?"):
                             # Iterate through parts and append text
                             for part in chunk.candidates[0].content.parts:
                                 # Assuming 'text' attribute exists in each part
-                                chunk_text += part.text
+                                if hasattr(part, 'text') and part.text:
+                                    chunk_text += part.text
 
                     except (AttributeError, IndexError, TypeError) as e:
                         # Catch potential errors if chunk structure is unexpected
@@ -255,4 +254,3 @@ if prompt := st.chat_input("What would you like to ask?"):
         st.error(f"An error occurred while sending message: {e}")
         # Add an error message to the chat history
         st.session_state.messages.append({"role": "assistant", "content": f"*Error: Could not get response. {e}*"})
-
