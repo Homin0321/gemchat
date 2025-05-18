@@ -1,6 +1,6 @@
 import streamlit as st
 from google import genai
-from google.genai.types import Tool, GenerateContentConfig, GoogleSearch
+from google.genai.types import Tool, GenerateContentConfig, GoogleSearch, ThinkingConfig
 from streamlit_paste_button import paste_image_button as pbutton
 from io import BytesIO
 import PIL.Image
@@ -58,10 +58,10 @@ with st.sidebar:
 
     # Model Selection
     model_options = [
+        "gemini-2.5-flash-preview-04-17",
+        "gemini-2.5-pro-preview-05-06",
         "gemini-2.0-flash",
         "gemini-2.0-flash-lite",
-        "gemini-2.5-flash-preview-04-17",
-        "gemini-2.5-pro-preview-05-06"
     ]
 
     selected_model = st.selectbox(
@@ -74,9 +74,13 @@ with st.sidebar:
     # Add a checkbox to include or exclude the config
     ground_search = st.checkbox("Ground Google Search", value=False)
 
+    # Thinking Budget Slide
+    thinking_budget = st.slider("Thinking Budget", min_value=0, max_value=24576, value=0, step=1024)
+
     if st.button("Change Model", use_container_width=True):
         st.session_state.gemini_chat_session = None
         st.session_state.ground_search = ground_search
+        st.session_state.thinking_budget = thinking_budget
         st.session_state.messages = [
             {"role": "assistant", "content": "Hello! How can I help you today?"}
         ]
@@ -108,6 +112,11 @@ def get_gemini_chat_session(model_name):
             config = GenerateContentConfig(
                 tools=[google_search_tool],
                 response_modalities=["TEXT"],
+                thinking_config=ThinkingConfig(thinking_budget=st.session_state.get("thinking_budget", 0))
+            )
+        else:
+            config = GenerateContentConfig(
+                thinking_config=ThinkingConfig(thinking_budget=st.session_state.get("thinking_budget", 0))
             )
 
         chat = client.chats.create(
