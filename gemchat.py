@@ -212,11 +212,6 @@ if prompt := st.chat_input("What would you like to ask?"):
                 # After the loop, display the final full content without the indicator
                 message_placeholder.markdown(full_response_content)
 
-            except genai.types.BlockedPromptException as e:
-                # Handle cases where the prompt itself was blocked before streaming
-                st.error(f"Your prompt was blocked: {e}")
-                full_response_content = f"*Prompt blocked by safety settings.*"
-                message_placeholder.markdown(full_response_content)
             except Exception as e:
                 # Handle other errors during the streaming process
                 st.error(f"An error occurred during response generation: {e}")
