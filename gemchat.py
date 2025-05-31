@@ -73,6 +73,7 @@ with st.sidebar:
 
     # Add a checkbox to include or exclude the config
     ground_search = st.checkbox("Ground Google Search", value=False)
+    url_context = st.checkbox("Use URL Context", value=False)
 
     # Thinking Budget Slide
     thinking_budget = st.slider("Thinking Budget", min_value=0, max_value=24576, value=0, step=1024)
@@ -80,6 +81,7 @@ with st.sidebar:
     if st.button("Change Model", use_container_width=True):
         st.session_state.gemini_chat_session = None
         st.session_state.ground_search = ground_search
+        st.session_state.url_context = url_context
         st.session_state.thinking_budget = thinking_budget
         st.session_state.messages = [
             {"role": "assistant", "content": "Hello! How can I help you today?"}
@@ -104,27 +106,31 @@ def get_gemini_chat_session(model_name):
     try:
         client = get_gemini_client(API_KEY)
 
-        config = None  # Initialize config to None
+        tools_list = []
+        thinking_budget = st.session_state.get("thinking_budget", 0)
+
         if st.session_state.get("ground_search", False):
             google_search_tool = Tool(
-                google_search = GoogleSearch()
+                google_search=GoogleSearch()
             )
-            config = GenerateContentConfig(
-                tools=[google_search_tool],
-                response_modalities=["TEXT"],
-                thinking_config=ThinkingConfig(thinking_budget=st.session_state.get("thinking_budget", 0))
+            tools_list.append(google_search_tool)
+        elif st.session_state.get("url_context", False):
+            url_context_tool = Tool(
+                url_context = genai.types.UrlContext
             )
-        else:
-            config = GenerateContentConfig(
-                thinking_config=ThinkingConfig(thinking_budget=st.session_state.get("thinking_budget", 0))
-            )
+            tools_list.append(url_context_tool)
+
+        gemini_config = GenerateContentConfig(
+            tools=tools_list,
+            response_modalities=["TEXT"],
+            thinking_config=ThinkingConfig(thinking_budget=thinking_budget)
+        )
 
         chat = client.chats.create(
             model=model_name,
-            config=config  # Pass the config (or None)
+            config=gemini_config
         )
 
-        # Start the chat session with history
         return chat
 
     except Exception as e:
