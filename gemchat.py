@@ -56,7 +56,7 @@ with st.sidebar:
         st.session_state.text = ''  # Clear text
         st.rerun()  # Rerun the app to reflect the cleared state
 
-    if st.button("Resubmit Last Input", use_container_width=True):
+    if st.button("Resubmit Last Prompt", use_container_width=True):
         last_user_prompt = None
         if "messages" in st.session_state:
             for msg in reversed(st.session_state.messages):
