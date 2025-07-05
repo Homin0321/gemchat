@@ -56,6 +56,19 @@ with st.sidebar:
         st.session_state.text = ''  # Clear text
         st.rerun()  # Rerun the app to reflect the cleared state
 
+    if st.button("Resubmit Last Input", use_container_width=True):
+        last_user_prompt = None
+        if "messages" in st.session_state:
+            for msg in reversed(st.session_state.messages):
+                if msg["role"] == "user":
+                    last_user_prompt = msg["content"]
+                    break
+        if last_user_prompt:
+            st.session_state.prompt_to_resubmit = last_user_prompt
+            st.rerun()
+        else:
+            st.warning("No previous user input to resubmit.")
+
     # Model Selection
     model_options = [
         "gemini-2.5-flash-preview-05-20",
@@ -147,7 +160,10 @@ for msg in st.session_state.messages:
         st.markdown(msg["content"])  # Use markdown for better formatting
 
 # --- Handle User Input ---
-if prompt := st.chat_input("What would you like to ask?"):
+resubmit_prompt = st.session_state.pop("prompt_to_resubmit", None)
+prompt = resubmit_prompt or st.chat_input("What would you like to ask?")
+
+if prompt:
     # Ensure chat session is initialized
     if st.session_state.gemini_chat_session is None:
         st.session_state.gemini_chat_session = get_gemini_chat_session(selected_model)
