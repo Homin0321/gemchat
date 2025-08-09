@@ -38,9 +38,17 @@ with st.sidebar:
 
     paste_result = pbutton("Upload Clipboard Image", text_color="#000000",
         background_color="#FFFFFF", hover_background_color="#FF8884")
+    if paste_result.image_data is not None:
+        st.image(paste_result.image_data, use_container_width=True)
 
     if st.button("Input Text", use_container_width=True):
         input_text()
+
+    if st.session_state.get("text"):
+        preview = st.session_state.text
+        if len(preview) > 20:
+            preview = preview[:20] + "..."
+        st.caption(f"📝 {preview}")
 
     if st.button("Clear Text", use_container_width=True):
         st.session_state.text = ''  # No need to check if it exists first
@@ -73,7 +81,8 @@ with st.sidebar:
     model_options = [
         "gemini-2.5-flash-lite",
         "gemini-2.5-flash",
-        #"gemini-2.5-pro",
+        "gemini-2.0-flash-lite",
+        "gemini-2.0-flash",
     ]
 
     selected_model = st.selectbox(
