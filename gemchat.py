@@ -172,6 +172,9 @@ resubmit_prompt = st.session_state.pop("prompt_to_resubmit", None)
 prompt = resubmit_prompt or st.chat_input("What would you like to ask?")
 
 if prompt:
+    # Ensure st.session_state.text is initialized and persists
+    if "text" not in st.session_state:
+        st.session_state.text = ""
     # Ensure chat session is initialized
     if st.session_state.gemini_chat_session is None:
         st.session_state.gemini_chat_session = get_gemini_chat_session(selected_model)
@@ -190,7 +193,7 @@ if prompt:
         chat = st.session_state.gemini_chat_session
         # Ensure streaming is enabled
         input_prompt = prompt  # Initialize with the user's prompt
-        if "text" in st.session_state and st.session_state.text:
+        if st.session_state.text:
             input_prompt = [prompt, st.session_state.text]
 
         if paste_result.image_data is not None:
