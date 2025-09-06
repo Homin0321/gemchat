@@ -1,10 +1,9 @@
 import streamlit as st
 from google import genai
-from google.genai.types import Tool, GenerateContentConfig, GoogleSearch, ThinkingConfig
+from google.genai.types import Tool, GenerateContentConfig, GoogleSearch, ThinkingConfig, UrlContext
 from streamlit_paste_button import paste_image_button as pbutton
 from io import BytesIO
 import PIL.Image
-import os
 
 API_KEY = st.secrets["api_key"]
 
@@ -33,13 +32,30 @@ st.set_page_config(
     layout="wide"
 )
 
+# --- Session State Defaults ---
+if "text" not in st.session_state:
+    st.session_state.text = ""
+if "pasted_image" not in st.session_state:
+    st.session_state.pasted_image = None
+if "thinking_budget" not in st.session_state:
+    st.session_state.thinking_budget = 0
+if "ground_search" not in st.session_state:
+    st.session_state.ground_search = False
+if "url_context" not in st.session_state:
+    st.session_state.url_context = False
+
 with st.sidebar:
     st.header("Gemini Chatbot")
 
     paste_result = pbutton("Upload Clipboard Image", text_color="#000000",
         background_color="#FFFFFF", hover_background_color="#FF8884")
     if paste_result.image_data is not None:
+        # Show the pasted image
         st.image(paste_result.image_data, use_container_width=True)
+        # Persist the image as bytes in session state for safe access outside the sidebar
+        _buf = BytesIO()
+        paste_result.image_data.save(_buf, format='PNG')
+        st.session_state.pasted_image = _buf.getvalue()
 
     if st.button("Input Text", use_container_width=True):
         input_text()
@@ -51,7 +67,9 @@ with st.sidebar:
         st.caption(f"📝 {preview}")
 
     if st.button("Clear Text", use_container_width=True):
-        st.session_state.text = ''  # No need to check if it exists first
+        st.session_state.text = ''
+        st.session_state.pasted_image = None
+        st.rerun()
 
     if st.button("Show Markdown", use_container_width=True):
         show_markdown()
@@ -61,21 +79,26 @@ with st.sidebar:
             {"role": "assistant", "content": "Hello! How can I help you today?"}
         ]
         st.session_state.gemini_chat_session = None  # Reset chat session object
-        st.session_state.text = ''  # Clear text
+        st.session_state.text = ''
+        st.session_state.pasted_image = None
         st.rerun()  # Rerun the app to reflect the cleared state
 
-    if st.button("Resubmit Last Prompt", use_container_width=True):
-        last_user_prompt = None
-        if "messages" in st.session_state:
-            for msg in reversed(st.session_state.messages):
-                if msg["role"] == "user":
-                    last_user_prompt = msg["content"]
-                    break
-        if last_user_prompt:
-            st.session_state.prompt_to_resubmit = last_user_prompt
-            st.rerun()
-        else:
-            st.warning("No previous user input to resubmit.")
+    default_prompt_options = [
+        "다음 내용 상세 정리해줘:",
+        "다음 내용 요약해줘:",
+        "다음 내용 부연 설명해줘:"
+    ]
+
+    default_prompt = st.selectbox(
+        "Select Prompt:",
+        options=default_prompt_options,
+        index=0,
+        key="default_prompt_select"
+    )
+
+    if st.button("Send Prompt", use_container_width=True):
+        st.session_state.selected_prompt = default_prompt
+        st.rerun()
 
     # Model Selection
     model_options = [
@@ -98,7 +121,10 @@ with st.sidebar:
     url_context = st.checkbox("Use URL Context", value=False)
 
     # Thinking Budget Slide
-    thinking_budget = st.slider("Thinking Budget", min_value=0, max_value=24576, value=0, step=1024)
+    thinking_budget = st.slider(
+        "Thinking Budget", min_value=0, max_value=24576,
+        value=st.session_state.get("thinking_budget", 0), step=1024
+    )
 
     if st.button("Change Model", use_container_width=True):
         st.session_state.gemini_chat_session = None
@@ -138,7 +164,7 @@ def get_gemini_chat_session(model_name):
             tools_list.append(google_search_tool)
         elif st.session_state.get("url_context", False):
             url_context_tool = Tool(
-                url_context = genai.types.UrlContext
+                url_context=UrlContext()
             )
             tools_list.append(url_context_tool)
 
@@ -169,8 +195,8 @@ for msg in st.session_state.messages:
         st.markdown(msg["content"])  # Use markdown for better formatting
 
 # --- Handle User Input ---
-resubmit_prompt = st.session_state.pop("prompt_to_resubmit", None)
-prompt = resubmit_prompt or st.chat_input("What would you like to ask?")
+selected_prompt = st.session_state.pop("selected_prompt", None)
+prompt = selected_prompt or st.chat_input("What would you like to ask?")
 
 if prompt:
     # Ensure st.session_state.text is initialized and persists
@@ -192,28 +218,26 @@ if prompt:
     # Send user message to Gemini and get response (streaming)
     try:
         chat = st.session_state.gemini_chat_session
-        # Ensure streaming is enabled
-        input_prompt = prompt  # Initialize with the user's prompt
-        if st.session_state.text:
-            input_prompt = [prompt, st.session_state.text]
 
-        if paste_result.image_data is not None:
-            image_bytes = BytesIO()
-            paste_result.image_data.save(image_bytes, format='PNG')
-            image_bytes = image_bytes.getvalue()
+        # Build a clean list of parts to send (text, optional extra text, optional image)
+        parts = [prompt]
+        if st.session_state.text:
+            parts.append(st.session_state.text)
+
+        if st.session_state.pasted_image is not None:
             try:
-                with open("st_image.png", 'wb') as f:
-                    f.write(image_bytes)
-                image = PIL.Image.open("st_image.png")
-                input_prompt = [input_prompt, image]
+                image = PIL.Image.open(BytesIO(st.session_state.pasted_image))
+                parts.append(image)
             except Exception as e:
                 st.error(f"Error processing image: {e}")
             finally:
-                paste_result.image_data = None  # Clear the image data
-                if os.path.exists("st_image.png"):
-                    os.remove("st_image.png")
+                # Clear after attempting to attach once so we don't resend repeatedly
+                st.session_state.pasted_image = None
 
-        response_stream = chat.send_message_stream(input_prompt)
+        # If only one part (just the prompt), send a string; otherwise send the list of parts
+        input_payload = parts[0] if len(parts) == 1 else parts
+
+        response_stream = chat.send_message_stream(input_payload)
 
         full_response_content = ""
         with st.chat_message("assistant"):
@@ -259,23 +283,17 @@ if prompt:
         # Handle cases where the stream finished but produced no text (e.g., safety block on response)
         elif not full_response_content:
             try:
-                # Attempt to get more specific feedback if available
-                feedback = chat.last_response.prompt_feedback if hasattr(chat, 'last_response') and chat.last_response else None
-                finish_reason_val = chat.last_response.candidates[0].finish_reason if (
-                    hasattr(chat, 'last_response') and chat.last_response and
-                    chat.last_response.candidates
-                ) else "Unknown"
-                # Convert finish_reason enum to string if possible
+                last_resp = getattr(chat, 'last_response', None)
+                feedback = getattr(last_resp, 'prompt_feedback', None)
+                candidate0 = None
+                if last_resp and getattr(last_resp, 'candidates', None):
+                    candidate0 = last_resp.candidates[0]
+                finish_reason_val = getattr(candidate0, 'finish_reason', 'Unknown')
                 finish_reason = getattr(finish_reason_val, 'name', str(finish_reason_val))
-
-                block_reason_val = feedback.block_reason if feedback else "Unknown"
-                # Convert block_reason enum to string if possible
+                block_reason_val = getattr(feedback, 'block_reason', 'Unknown')
                 block_reason = getattr(block_reason_val, 'name', str(block_reason_val))
-
                 reason_text = f"Finish Reason: {finish_reason}, Block Reason: {block_reason}"
-
             except Exception as e:
-                # Fallback if accessing response details fails
                 reason_text = f"Unknown reason (possibly safety filter or stop sequence). Error accessing details: {e}"
 
             error_message = f"*Response was empty or blocked. {reason_text}*"
