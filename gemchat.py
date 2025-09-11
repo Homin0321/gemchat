@@ -205,18 +205,12 @@ with chat_container:
 # Place input at the bottom and handle it properly
 selected_prompt = st.session_state.pop("selected_prompt", None)
 
-# Use a form to prevent multiple submissions
-with st.form(key="chat_input_form", clear_on_submit=True):
-    col1, col2 = st.columns([6, 1])
-    with col1:
-        user_input = st.text_input("What would you like to ask?", key="user_input_field", label_visibility="collapsed")
-    with col2:
-        submit_button = st.form_submit_button("Send", use_container_width=True)
+user_input = st.chat_input("What would you like to ask?")
 
 # Process input from either the form or selected prompt
 prompt = None
-if submit_button and user_input.strip():
-    prompt = user_input.strip()
+if user_input:
+    prompt = user_input
 elif selected_prompt:
     prompt = selected_prompt
 
