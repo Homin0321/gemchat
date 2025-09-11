@@ -16,7 +16,9 @@ def get_gemini_client(api_key):
 def input_text():
     text = st.session_state.get("text", "")  # Use get to avoid KeyError
     text = st.text_area("Edit:", text, height=600, label_visibility="collapsed")
-    st.session_state.text = text
+    if st.button("Save Text"):
+        st.session_state.text = text
+        st.rerun()
 
 @st.dialog("Markdown Source", width="large")
 def show_markdown():
@@ -43,6 +45,14 @@ if "ground_search" not in st.session_state:
     st.session_state.ground_search = False
 if "url_context" not in st.session_state:
     st.session_state.url_context = False
+if "messages" not in st.session_state:
+    st.session_state.messages = [
+        {"role": "assistant", "content": "Hello! How can I help you today?"}
+    ]
+if "gemini_chat_session" not in st.session_state:
+    st.session_state.gemini_chat_session = None
+if "selected_model" not in st.session_state:
+    st.session_state.selected_model = "gemini-2.5-flash-lite"
 
 with st.sidebar:
     st.header("Gemini Chatbot")
@@ -112,13 +122,13 @@ with st.sidebar:
     selected_model = st.selectbox(
         "Select Model:",
         options=model_options,
-        index=0,  # Default to the first model
-        key="model_select"  # Use a key for the selectbox
+        index=model_options.index(st.session_state.selected_model) if st.session_state.selected_model in model_options else 0,
+        key="model_select"
     )
 
     # Add a checkbox to include or exclude the config
-    ground_search = st.checkbox("Ground Google Search", value=False)
-    url_context = st.checkbox("Use URL Context", value=False)
+    ground_search = st.checkbox("Ground Google Search", value=st.session_state.get("ground_search", False))
+    url_context = st.checkbox("Use URL Context", value=st.session_state.get("url_context", False))
 
     # Thinking Budget Slide
     thinking_budget = st.slider(
@@ -126,27 +136,20 @@ with st.sidebar:
         value=st.session_state.get("thinking_budget", 0), step=1024
     )
 
-    if st.button("Change Model", use_container_width=True):
-        st.session_state.gemini_chat_session = None
-        st.session_state.ground_search = ground_search
-        st.session_state.url_context = url_context
-        st.session_state.thinking_budget = thinking_budget
-        st.session_state.messages = [
-            {"role": "assistant", "content": "Hello! How can I help you today?"}
-        ]
-        st.rerun()
+    # Only recreate session if model or settings actually changed
+    if (selected_model != st.session_state.get("selected_model") or
+        ground_search != st.session_state.get("ground_search") or
+        url_context != st.session_state.get("url_context") or
+        thinking_budget != st.session_state.get("thinking_budget")):
+        
+        if st.button("Apply Changes", use_container_width=True):
+            st.session_state.gemini_chat_session = None
+            st.session_state.selected_model = selected_model
+            st.session_state.ground_search = ground_search
+            st.session_state.url_context = url_context
+            st.session_state.thinking_budget = thinking_budget
+            st.rerun()
 
-
-# --- Initialization ---
-# Initialize chat history in session state if it doesn't exist
-if "messages" not in st.session_state:
-    st.session_state.messages = [
-        {"role": "assistant", "content": "Hello! How can I help you today?"}
-    ]
-
-# Initialize chat session object in session state
-if "gemini_chat_session" not in st.session_state:
-    st.session_state.gemini_chat_session = None
 
 # --- Gemini Model Interaction ---
 # Function to configure and get the chat model
@@ -187,31 +190,52 @@ def get_gemini_chat_session(model_name):
 
 # Attempt to get/create chat session if API key is available and session doesn't exist
 if st.session_state.gemini_chat_session is None:
-    st.session_state.gemini_chat_session = get_gemini_chat_session(selected_model)
+    st.session_state.gemini_chat_session = get_gemini_chat_session(st.session_state.selected_model)
 
 # --- Display Chat History ---
-for msg in st.session_state.messages:
-    with st.chat_message(msg["role"]):
-        st.markdown(msg["content"])  # Use markdown for better formatting
+# Create a container for chat messages to prevent layout issues
+chat_container = st.container()
+with chat_container:
+    for i, msg in enumerate(st.session_state.messages):
+        with st.chat_message(msg["role"]):
+            # Add message index for debugging if needed
+            st.markdown(msg["content"])
 
 # --- Handle User Input ---
+# Place input at the bottom and handle it properly
 selected_prompt = st.session_state.pop("selected_prompt", None)
-prompt = selected_prompt or st.chat_input("What would you like to ask?")
+
+# Use a form to prevent multiple submissions
+with st.form(key="chat_input_form", clear_on_submit=True):
+    col1, col2 = st.columns([6, 1])
+    with col1:
+        user_input = st.text_input("What would you like to ask?", key="user_input_field", label_visibility="collapsed")
+    with col2:
+        submit_button = st.form_submit_button("Send", use_container_width=True)
+
+# Process input from either the form or selected prompt
+prompt = None
+if submit_button and user_input.strip():
+    prompt = user_input.strip()
+elif selected_prompt:
+    prompt = selected_prompt
 
 if prompt:
-    # Ensure st.session_state.text is initialized and persists
-    if "text" not in st.session_state:
-        st.session_state.text = ""
     # Ensure chat session is initialized
     if st.session_state.gemini_chat_session is None:
-        st.session_state.gemini_chat_session = get_gemini_chat_session(selected_model)
+        with st.spinner("Initializing chat session..."):
+            st.session_state.gemini_chat_session = get_gemini_chat_session(st.session_state.selected_model)
+        
         # If it's still None after trying, show error and stop
         if st.session_state.gemini_chat_session is None:
             st.error("Failed to initialize chat session. Please check API key and configuration.")
             st.stop()
 
     # Add user message to session state and display it
-    st.session_state.messages.append({"role": "user", "content": prompt})
+    user_message = {"role": "user", "content": prompt}
+    st.session_state.messages.append(user_message)
+    
+    # Display the new user message
     with st.chat_message("user"):
         st.markdown(prompt)
 
@@ -237,29 +261,33 @@ if prompt:
         # If only one part (just the prompt), send a string; otherwise send the list of parts
         input_payload = parts[0] if len(parts) == 1 else parts
 
-        response_stream = chat.send_message_stream(input_payload)
-
-        full_response_content = ""
+        # Show loading indicator
         with st.chat_message("assistant"):
-            message_placeholder = st.empty()  # Use a placeholder for stream updates
+            message_placeholder = st.empty()
+            message_placeholder.markdown("🤔 Thinking...")
+            
             try:
+                response_stream = chat.send_message_stream(input_payload)
+                full_response_content = ""
+                
                 for chunk in response_stream:
                     chunk_text = ""
                     # Safely access nested structure based on the provided example
                     try:
                         # Check if candidates exist and have content with parts
-                        if chunk.candidates and chunk.candidates[0].content and chunk.candidates[0].content.parts:
-                            # Iterate through parts and append text
-                            for part in chunk.candidates[0].content.parts:
-                                # Assuming 'text' attribute exists in each part
-                                if hasattr(part, 'text') and part.text:
-                                    chunk_text += part.text
+                        if hasattr(chunk, 'candidates') and chunk.candidates:
+                            candidate = chunk.candidates[0]
+                            if hasattr(candidate, 'content') and candidate.content:
+                                if hasattr(candidate.content, 'parts') and candidate.content.parts:
+                                    # Iterate through parts and append text
+                                    for part in candidate.content.parts:
+                                        # Assuming 'text' attribute exists in each part
+                                        if hasattr(part, 'text') and part.text:
+                                            chunk_text += part.text
 
                     except (AttributeError, IndexError, TypeError) as e:
-                        # Catch potential errors if chunk structure is unexpected
-                        # This might happen for non-content chunks or API changes
-                        # st.warning(f"Skipping chunk with unexpected structure: {e}") # Uncomment for debugging
-                        pass  # Continue to the next chunk
+                        # Continue to the next chunk if there's an error
+                        continue
 
                     # If text was extracted from this chunk, append and update display
                     if chunk_text:
@@ -268,45 +296,32 @@ if prompt:
                         message_placeholder.markdown(full_response_content + "▌")
 
                 # After the loop, display the final full content without the indicator
-                message_placeholder.markdown(full_response_content)
+                if full_response_content:
+                    message_placeholder.markdown(full_response_content)
+                    # Add Gemini's response to session state
+                    assistant_message = {"role": "assistant", "content": full_response_content}
+                    st.session_state.messages.append(assistant_message)
+                else:
+                    # Handle empty response
+                    error_message = "*No response generated. This might be due to content filtering or other restrictions.*"
+                    message_placeholder.markdown(error_message)
+                    assistant_message = {"role": "assistant", "content": error_message}
+                    st.session_state.messages.append(assistant_message)
 
             except Exception as e:
-                # Handle other errors during the streaming process
-                st.error(f"An error occurred during response generation: {e}")
-                full_response_content = f"*Error generating response.*"
-                message_placeholder.markdown(full_response_content)
-
-        # Add Gemini's full text response to session state
-        # Check if the response is non-empty and not just an error message we added
-        if full_response_content and not full_response_content.startswith("*"):
-            st.session_state.messages.append({"role": "assistant", "content": full_response_content})
-        # Handle cases where the stream finished but produced no text (e.g., safety block on response)
-        elif not full_response_content:
-            try:
-                last_resp = getattr(chat, 'last_response', None)
-                feedback = getattr(last_resp, 'prompt_feedback', None)
-                candidate0 = None
-                if last_resp and getattr(last_resp, 'candidates', None):
-                    candidate0 = last_resp.candidates[0]
-                finish_reason_val = getattr(candidate0, 'finish_reason', 'Unknown')
-                finish_reason = getattr(finish_reason_val, 'name', str(finish_reason_val))
-                block_reason_val = getattr(feedback, 'block_reason', 'Unknown')
-                block_reason = getattr(block_reason_val, 'name', str(block_reason_val))
-                reason_text = f"Finish Reason: {finish_reason}, Block Reason: {block_reason}"
-            except Exception as e:
-                reason_text = f"Unknown reason (possibly safety filter or stop sequence). Error accessing details: {e}"
-
-            error_message = f"*Response was empty or blocked. {reason_text}*"
-            st.session_state.messages.append({"role": "assistant", "content": error_message})
-            # Avoid showing a warning if we already displayed an error message during streaming
-            if not full_response_content.startswith("*"):
-                st.warning(error_message)  # Show warning in the main chat area too
-        else:
-            # If full_response_content contains one of our error messages, just add it
-            st.session_state.messages.append({"role": "assistant", "content": full_response_content})
+                # Handle errors during streaming
+                error_message = f"*Error generating response: {str(e)}*"
+                message_placeholder.markdown(error_message)
+                assistant_message = {"role": "assistant", "content": error_message}
+                st.session_state.messages.append(assistant_message)
 
     except Exception as e:
-        # Handle errors before starting the stream (e.g., connection issue, API key during send)
+        # Handle errors before starting the stream
         st.error(f"An error occurred while sending message: {e}")
-        # Add an error message to the chat history
-        st.session_state.messages.append({"role": "assistant", "content": f"*Error: Could not get response. {e}*"})
+        error_message = f"*Error: Could not send message. {str(e)}*"
+        assistant_message = {"role": "assistant", "content": error_message}
+        st.session_state.messages.append(assistant_message)
+        
+    # Clear text after successful message send
+    st.session_state.text = ""
+    st.rerun()
