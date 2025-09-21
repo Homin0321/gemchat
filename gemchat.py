@@ -61,13 +61,13 @@ with st.sidebar:
         background_color="#FFFFFF", hover_background_color="#FF8884")
     if paste_result.image_data is not None:
         # Show the pasted image
-        st.image(paste_result.image_data, use_container_width=True)
+        st.image(paste_result.image_data, width="stretch")
         # Persist the image as bytes in session state for safe access outside the sidebar
         _buf = BytesIO()
         paste_result.image_data.save(_buf, format='PNG')
         st.session_state.pasted_image = _buf.getvalue()
 
-    if st.button("Input Text", use_container_width=True):
+    if st.button("Input Text", width="stretch"):
         input_text()
 
     if st.session_state.get("text"):
@@ -76,15 +76,15 @@ with st.sidebar:
             preview = preview[:20] + "..."
         st.caption(f"📝 {preview}")
 
-    if st.button("Clear Text", use_container_width=True):
+    if st.button("Clear Text", width="stretch"):
         st.session_state.text = ''
         st.session_state.pasted_image = None
         st.rerun()
 
-    if st.button("Show Markdown", use_container_width=True):
+    if st.button("Show Markdown", width="stretch"):
         show_markdown()
 
-    if st.button("Clear Chat History", use_container_width=True, key="clear_chat"):
+    if st.button("Clear Chat History", width="stretch", key="clear_chat"):
         st.session_state.messages = [
             {"role": "assistant", "content": "Hello! How can I help you today?"}
         ]
@@ -107,7 +107,7 @@ with st.sidebar:
         key="default_prompt_select"
     )
 
-    if st.button("Send Prompt", use_container_width=True):
+    if st.button("Send Prompt", width="stretch"):
         st.session_state.selected_prompt = default_prompt
         st.rerun()
 
@@ -143,7 +143,7 @@ with st.sidebar:
         url_context != st.session_state.get("url_context") or
         thinking_budget != st.session_state.get("thinking_budget")):
         
-        if st.button("Apply Changes", use_container_width=True):
+        if st.button("Apply Changes", width="stretch"):
             st.session_state.gemini_chat_session = None
             st.session_state.selected_model = selected_model
             st.session_state.ground_search = ground_search
