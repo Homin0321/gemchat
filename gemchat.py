@@ -96,7 +96,8 @@ with st.sidebar:
     default_prompt_options = [
         "다음 내용 상세 정리해줘:",
         "다음 내용 요약해줘:",
-        "다음 내용 부연 설명해줘:"
+        "다음 내용 부연 설명해줘:",
+        "다음 번역해줘:"
     ]
 
     default_prompt = st.selectbox(
