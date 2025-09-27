@@ -52,7 +52,7 @@ if "messages" not in st.session_state:
 if "gemini_chat_session" not in st.session_state:
     st.session_state.gemini_chat_session = None
 if "selected_model" not in st.session_state:
-    st.session_state.selected_model = "gemini-2.5-flash-lite"
+    st.session_state.selected_model = "gemini-flash-lite-latest"
 
 with st.sidebar:
     st.header("Gemini Chatbot")
@@ -114,6 +114,8 @@ with st.sidebar:
 
     # Model Selection
     model_options = [
+        "gemini-flash-lite-latest",
+        "gemini-flash-latest",
         "gemini-2.5-flash-lite",
         "gemini-2.5-flash",
         "gemini-2.5-pro",
