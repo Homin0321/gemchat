@@ -108,12 +108,13 @@ with st.sidebar:
         st.rerun()  # Rerun the app to reflect the cleared state
 
     default_prompt_options = [
+        "다음 의미를 알려줘:",
         "다음 내용 상세 정리해줘:",
         "다음 내용 요약해줘:",
         "다음 내용 부연 설명해줘:",
         "다음 번역해줘:",
         "다음 간결한 표현으로 수정해줘:",
-        "다음 재작성해줘:",
+        "다음 논리적인 문장으로 재작성해줘:",
     ]
 
     default_prompt = st.selectbox(
