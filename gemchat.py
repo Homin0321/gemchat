@@ -133,10 +133,8 @@ with st.sidebar:
     # Model Selection
     model_options = [
         "gemini-flash-lite-latest",
-        "gemini-flash-latest",
         "gemini-2.5-flash-lite",
         "gemini-2.5-flash",
-        "gemini-2.5-pro",
         "gemini-3-flash-preview",
         "gemini-3-pro-preview",
     ]
@@ -364,7 +362,9 @@ if prompt:
 
                 # After the loop, display the final full content without the indicator
                 if full_response_content:
-                    full_response_content = fix_markdown_symbol_issue(full_response_content)
+                    full_response_content = fix_markdown_symbol_issue(
+                        full_response_content
+                    )
                     message_placeholder.markdown(full_response_content)
                     # Add Gemini's response to session state
                     assistant_message = {
