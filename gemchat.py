@@ -231,6 +231,19 @@ def fix_markdown_symbol_issue(md: str) -> str:
             return f"**{inner}** "
         return m.group(0)
 
+    # Pattern for the italic fix (avoid matching bold **)
+    italic_pattern = re.compile(
+        r"(?<!\*)\*(?![*])(.+?)(?<!\*)\*(?![*])(\s*)", re.DOTALL
+    )
+
+    def italic_repl(m):
+        inner = m.group(1)
+        after = m.group(2)
+        # Add space after * if content contains quotes and no space exists
+        if re.search(r"['\"]", inner) and after == "":
+            return f"*{inner}* "
+        return m.group(0)
+
     for i in range(len(parts)):
         # Even indices are regular text; Odd indices are code blocks (the delimiters)
         if i % 2 == 0:
@@ -244,6 +257,9 @@ def fix_markdown_symbol_issue(md: str) -> str:
 
             # 3. Apply bold spacing fix
             part = bold_pattern.sub(bold_repl, part)
+
+            # 4. Apply italic spacing fix
+            part = italic_pattern.sub(italic_repl, part)
 
             parts[i] = part
 
