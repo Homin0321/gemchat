@@ -226,9 +226,12 @@ def fix_markdown_symbol_issue(md: str) -> str:
     def bold_repl(m):
         inner = m.group(1)
         after = m.group(2)
+        inner = inner.lstrip()
         # Add space after ** if content contains symbols and no space exists
         if re.search(r"[^0-9A-Za-z\s]", inner) and after == "":
             return f"**{inner}** "
+        if inner != m.group(1):
+            return f"**{inner}**{after}"
         return m.group(0)
 
     # Pattern for the italic fix (avoid matching bold **)
