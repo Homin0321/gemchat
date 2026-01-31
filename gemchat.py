@@ -81,6 +81,18 @@ with st.sidebar:
         paste_result.image_data.save(_buf, format="PNG")
         st.session_state.pasted_image = _buf.getvalue()
 
+    # Simple text input for quick editing
+    # flatten text for display in single-line input to avoid st.text_input error with newlines
+    text_input_val = st.session_state.text.replace("\n", " ")
+    quick_text = st.text_input(
+        "Quick Text Input",
+        value=text_input_val,
+        label_visibility="collapsed",
+    )
+    if quick_text != text_input_val:
+        st.session_state.text = quick_text
+        st.rerun()
+
     if st.button("Input Text", width="stretch"):
         input_text()
 
