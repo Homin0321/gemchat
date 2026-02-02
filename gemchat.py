@@ -240,7 +240,7 @@ def fix_markdown_symbol_issue(md: str) -> str:
         after = m.group(2)
         inner = inner.strip()
         # Add space after ** if content contains symbols and no space exists
-        if re.search(r"[^0-9A-Za-z\s]", inner) and after == "":
+        if re.search(r"[^0-9A-Za-z\s가-힣]", inner) and after == "":
             return f"**{inner}** "
         if inner != m.group(1):
             return f"**{inner}**{after}"
