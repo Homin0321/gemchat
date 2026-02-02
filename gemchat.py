@@ -238,7 +238,7 @@ def fix_markdown_symbol_issue(md: str) -> str:
     def bold_repl(m):
         inner = m.group(1)
         after = m.group(2)
-        inner = inner.lstrip()
+        inner = inner.strip()
         # Add space after ** if content contains symbols and no space exists
         if re.search(r"[^0-9A-Za-z\s]", inner) and after == "":
             return f"**{inner}** "
