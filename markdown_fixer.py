@@ -1,5 +1,7 @@
 import re
+
 import streamlit as st
+
 
 def fix_markdown_symbol_issue(md: str) -> str:
     """
@@ -24,7 +26,7 @@ def fix_markdown_symbol_issue(md: str) -> str:
             parts[i + 1] = parts[i + 1][2:]
 
     # Pattern for the bold fix
-    bold_pattern = re.compile(r"\*\*(.+?)\*\*(\s*)", re.DOTALL)
+    bold_pattern = re.compile(r"\*\*(.+?)\*\*(\s*)")
 
     def bold_repl(m):
         inner = m.group(1)
@@ -40,9 +42,7 @@ def fix_markdown_symbol_issue(md: str) -> str:
         return m.group(0)
 
     # Pattern for the italic fix (avoid matching bold **)
-    italic_pattern = re.compile(
-        r"(?<!\*)\*(?![*])(.+?)(?<!\*)\*(?![*])(\s*)", re.DOTALL
-    )
+    italic_pattern = re.compile(r"(?<!\*)\*(?![*])(.+?)(?<!\*)\*(?![*])(\s*)")
 
     def italic_repl(m):
         inner = m.group(1)
@@ -79,13 +79,19 @@ def fix_markdown_symbol_issue(md: str) -> str:
 st.set_page_config(page_title="Markdown Symbol Fixer", layout="wide", page_icon="🛠️")
 
 st.title("🛠️ Markdown Symbol Fixer")
-st.write("This tool applies `fix_markdown_symbol_issue` to your text to check how it handles symbols like `$`, `~`, `**`, and `*`.")
+st.write(
+    "This tool applies `fix_markdown_symbol_issue` to your text to check how it handles symbols like `$`, `~`, `**`, and `*`."
+)
 
 col1, col2 = st.columns(2)
 
 with col1:
     st.subheader("Input Markdown")
-    input_text = st.text_area("Paste your markdown here:", height=600, placeholder="e.g. Price is $100, approx ~50 items.")
+    input_text = st.text_area(
+        "Paste your markdown here:",
+        height=600,
+        placeholder="e.g. Price is $100, approx ~50 items.",
+    )
 
 with col2:
     st.subheader("Processed Output")

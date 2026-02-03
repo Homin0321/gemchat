@@ -247,7 +247,7 @@ def fix_markdown_symbol_issue(md: str) -> str:
             parts[i + 1] = parts[i + 1][2:]
 
     # Pattern for the bold fix
-    bold_pattern = re.compile(r"\*\*(.+?)\*\*(\s*)", re.DOTALL)
+    bold_pattern = re.compile(r"\*\*(.+?)\*\*(\s*)")
 
     def bold_repl(m):
         inner = m.group(1)
@@ -263,9 +263,7 @@ def fix_markdown_symbol_issue(md: str) -> str:
         return m.group(0)
 
     # Pattern for the italic fix (avoid matching bold **)
-    italic_pattern = re.compile(
-        r"(?<!\*)\*(?![*])(.+?)(?<!\*)\*(?![*])(\s*)", re.DOTALL
-    )
+    italic_pattern = re.compile(r"(?<!\*)\*(?![*])(.+?)(?<!\*)\*(?![*])(\s*)")
 
     def italic_repl(m):
         inner = m.group(1)
