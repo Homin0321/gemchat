@@ -1,3 +1,4 @@
+import uuid
 from io import BytesIO
 
 import PIL.Image
@@ -48,6 +49,8 @@ st.set_page_config(page_title="Gemini Chat", page_icon="💬", layout="wide")
 # --- Session State Defaults ---
 if "text" not in st.session_state:
     st.session_state.text = ""
+if "paste_key" not in st.session_state:
+    st.session_state.paste_key = str(uuid.uuid4())
 if "pasted_image" not in st.session_state:
     st.session_state.pasted_image = None
 if "thinking_budget" not in st.session_state:
@@ -73,6 +76,7 @@ with st.sidebar:
         text_color="#000000",
         background_color="#FFFFFF",
         hover_background_color="#FF8884",
+        key=st.session_state.paste_key,
     )
     if paste_result.image_data is not None:
         # Show the pasted image
@@ -106,6 +110,7 @@ with st.sidebar:
     if st.button("Clear Text", width="stretch"):
         st.session_state.text = ""
         st.session_state.pasted_image = None
+        st.session_state.paste_key = str(uuid.uuid4())
         st.rerun()
 
     if st.button("Show Markdown", width="stretch"):
@@ -118,6 +123,7 @@ with st.sidebar:
         st.session_state.gemini_chat_session = None  # Reset chat session object
         st.session_state.text = ""
         st.session_state.pasted_image = None
+        st.session_state.paste_key = str(uuid.uuid4())
         st.rerun()  # Rerun the app to reflect the cleared state
 
     default_prompt_options = [
