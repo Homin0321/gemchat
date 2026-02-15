@@ -1,8 +1,10 @@
+import os
 import uuid
 from io import BytesIO
 
 import PIL.Image
 import streamlit as st
+from dotenv import load_dotenv
 from google import genai
 from google.genai.types import (
     GenerateContentConfig,
@@ -15,7 +17,8 @@ from streamlit_paste_button import paste_image_button as pbutton
 
 from utils import fix_markdown_symbol_issue
 
-API_KEY = st.secrets["api_key"]
+load_dotenv()
+API_KEY = os.getenv("API_KEY")
 
 
 # Initialize the Gemini client (only once)
