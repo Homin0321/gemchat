@@ -20,6 +20,12 @@ from utils import fix_markdown_symbol_issue
 load_dotenv()
 API_KEY = os.getenv("API_KEY")
 
+if not API_KEY:
+    try:
+        API_KEY = st.secrets["API_KEY"]
+    except Exception:
+        pass
+
 
 # Initialize the Gemini client (only once)
 @st.cache_resource  # Cache the client to avoid re-initialization
