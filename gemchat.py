@@ -163,6 +163,7 @@ with st.sidebar:
         "gemini-flash-lite-latest",
         "gemini-3-flash-preview",
         "gemini-3-pro-preview",
+        "gemini-3.1-pro-preview",
         "gemini-2.5-flash-lite",
         "gemini-2.5-flash",
     ]
