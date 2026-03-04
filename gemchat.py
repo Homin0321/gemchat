@@ -160,9 +160,9 @@ with st.sidebar:
 
     # Model Selection
     model_options = [
-        "gemini-3.1-flash-lite-preview",
-        "gemini-3-flash-preview",
-        "gemini-3.1-pro-preview",
+        "gemini-flash-lite-latest",
+        "gemini-flash-latest",
+        "gemini-pro-latest",
         "gemini-2.5-flash-lite",
         "gemini-2.5-flash",
     ]
